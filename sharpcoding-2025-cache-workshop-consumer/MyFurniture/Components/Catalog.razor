@@ -1,0 +1,113 @@
+﻿@page "/catalog"
+@using Microsoft.Extensions.Options
+@using MyFurniture.Entity
+@using MyFurniture.Entity.Responses
+@attribute [StreamRendering]
+@rendermode InteractiveServer
+
+@inject IHttpClientFactory httpClientFactory
+@inject IOptions<Settings> options
+@inject NavigationManager navigation
+
+<PageTitle>Catalog</PageTitle>
+
+<h1 class="main-title text-center">Catalog</h1>
+<hr/>
+
+<div class="centered-content">
+    <Spinner Type="SpinnerType.Grow" Color="SpinnerColor.Dark" Visible="@_isLoading" Size="SpinnerSize.ExtraLarge"/>
+    <br/>
+    @if (_isLoading)
+    {
+        <small style="color: slategray">loading</small>
+    }
+</div>
+@if (_products != null)
+{
+    <div class="row">
+        @foreach (var product in _products)
+        {
+            <div class="col-md-4">
+                <div class="card mb-4 shadow-sm">
+                    @if (!string.IsNullOrEmpty(product.ImageUrl))
+                    {
+                        <img src="@product.ImageUrl" class="card-img-top" alt="@product.Name" style="object-fit: cover;"/>
+                    }
+                    <div class="card-body">
+                        <h5 class="card-title font-weight-bold">@product.Name</h5>
+                        <h6 class="card-subtitle mb-2 text-muted">@product.Category</h6>
+                        @if (product.Price != null)
+                        {
+                            <p class="card-text">
+                                <strong>Price:</strong> @product.Price.Value @product.Price.Currency
+                            </p>
+                        }
+                        @if (product.Stock != 0)
+                        {
+                            <small>Estimated stock: @product.Stock</small>
+                        }
+
+                        <div class="centered-content" style="margin-top: 10px;">
+                            <button class="btn btn-custom btn-block font-weight-bold" @onclick="() => ShowModal(product)">Detail</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+<Modal @ref="_productDetail" IsVerticallyCentered="true" Size="ModalSize.ExtraLarge"/>
+
+@code {
+    private HttpClient _client => httpClientFactory.CreateClient();
+    private List<Product>? _products;
+    private Modal _productDetail = default!;
+    private bool _isLoading => _products is null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var minimalProducts = await _client
+            .GetFromJsonAsync<ProductDto[]>(options.Value.BaseUrl + "/Product/All")
+            .ConfigureAwait(false);
+
+        var assets = await _client
+            .GetFromJsonAsync<AssetDto[]>(options.Value.BaseUrl + "/Asset/All")
+            .ConfigureAwait(false);
+
+        var prices = await _client
+            .GetFromJsonAsync<PriceDto[]>(options.Value.BaseUrl + "/Price/All")
+            .ConfigureAwait(false);
+
+        var stocks = await _client
+            .GetFromJsonAsync<StockDto[]>(options.Value.BaseUrl + "/Stock/All")
+            .ConfigureAwait(false);
+
+        _products = minimalProducts
+            .Select(x => ProductMapper.From(x, assets, prices, stocks))
+            .ToList();
+
+        await base.OnInitializedAsync();
+    }
+
+    protected override async void OnAfterRender(bool firstRender)
+    {
+        _productDetail.OnHiding = new EventCallback(null, () =>
+        {
+            navigation.NavigateTo("/catalog", true);
+        });
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    private async Task ShowModal(Product product)
+    {
+        await _productDetail.ShowAsync<ProductDetailModal>(
+            title: product.Name,
+            parameters: new Dictionary<string, object>()
+            {
+                { "Product", product }
+            });
+    }
+
+}

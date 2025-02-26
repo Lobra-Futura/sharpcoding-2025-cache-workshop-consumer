@@ -1,0 +1,29 @@
+﻿@inherits LayoutComponentBase
+
+<div class="page">
+
+    <main>
+        <div class="logo-band">
+            <img src="https://stsharpcodingassetswe.blob.core.windows.net/misc/logo.jpeg" alt="Logo" class="logo-image" />
+        </div>
+        <div class="my-menu">
+            <nav class="nav-menu">
+                <a class="nav-item" href="">Home</a>
+                <a class="nav-item" href="catalog">Catalog</a>
+                <a class="nav-item" href="https://www.lobrafutura.com/" target="_blank">About</a>
+            </nav>
+        </div>
+
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
+
+<div id="blazor-error-ui">
+    An unhandled error has occurred.
+    <a href="" class="reload">Reload</a>
+    <a class="dismiss">🗙</a>
+</div>
+
+<Preload LoadingText="Loading..." />

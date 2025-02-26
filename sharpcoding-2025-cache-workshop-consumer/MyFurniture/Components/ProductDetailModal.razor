@@ -1,0 +1,102 @@
+﻿@using Microsoft.Extensions.Options
+@using MyFurniture.Entity
+@using MyFurniture.Entity.Responses
+
+@inject IHttpClientFactory httpClientFactory
+@inject IOptions<Settings> options
+
+@if (!isAfterPurchase)
+{
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <img src="@Product.ImageUrl" class="img-fluid rounded" alt="@Product.Name"/>
+        </div>
+        <div class="col-md-8">
+            <p>
+                <strong>Description:</strong>
+                <p class="card-text">@Product.Description</p>
+            </p>
+            @if (Product.Price != null)
+            {
+                <p>
+                    <strong>Price:</strong> @Product.Price.Value @Product.Price.Currency
+                </p>
+            }
+            @if (Product.Stock != 0)
+            {
+                <p>
+                    <strong>Stock:</strong> @Product.Stock
+                </p>
+            }
+            <p>
+                <strong>Category:</strong> @Product.Category
+            </p>
+            <div>
+                <strong>Purchase:</strong>
+                <label for="quantity-@Product.Id">Quantity</label>
+                <input type="number" id="quantity-@Product.Id" min="1" max="@Product.Stock" @bind="Product.PurchaseQuantity" class="form-control"/>
+                <button type="button" class="btn btn-custom btn-block" @onclick="BuyProduct">Buy</button>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    if (isSuccessfullPurchase)
+    {
+        <div class="alert alert-success" role="alert">
+            @afterPurchaseMessage
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-danger" role="alert">
+            @afterPurchaseMessage
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public Product Product { get; set; }
+    private HttpClient _client => httpClientFactory.CreateClient();
+
+    private bool isAfterPurchase;
+    private bool isSuccessfullPurchase;
+    private string afterPurchaseMessage = string.Empty;
+
+    protected override async void OnInitialized()
+    {
+        var actualStock = await _client.GetFromJsonAsync<StockDto>(
+            options.Value.BaseUrl + $"/Stock/{Product.Id}");
+
+        Product.Stock = actualStock?.Quantity ?? 0;
+
+        await base.OnInitializedAsync();
+    }
+
+    private async Task BuyProduct()
+    {
+        var rx = await _client.PostAsJsonAsync(options.Value.BaseUrl + "/Order/Create",
+            new
+            {
+                User = "insert-username-here",
+                ProductId = Product.Id,
+                Quantity = Product.PurchaseQuantity
+            });
+
+        isAfterPurchase = true;
+        if (rx.IsSuccessStatusCode)
+        {
+            isSuccessfullPurchase = true;
+            afterPurchaseMessage = "The product was successfully purchased.";
+        }
+        else
+        {
+            var errMsg = await rx.Content.ReadAsStringAsync().ConfigureAwait(false);
+
+            isSuccessfullPurchase = false;
+            afterPurchaseMessage = $"The product could not be purchased. {errMsg}";
+        }
+    }
+
+}
