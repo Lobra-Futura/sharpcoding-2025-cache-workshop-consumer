@@ -1,5 +1,6 @@
 ﻿@page "/catalog"
 @using Microsoft.Extensions.Caching.Distributed
+@using Microsoft.Extensions.Caching.Hybrid
 @using Microsoft.Extensions.Caching.Memory
 @using Microsoft.Extensions.Options
 @using MyFurniture.Entity
@@ -14,6 +15,7 @@
 @inject IMemoryCache memCache
 @inject IRedisCache redisCache
 @inject IDistributedCache distributedCache
+@inject HybridCache hybridCache
 
 <PageTitle>Catalog</PageTitle>
 
@@ -73,41 +75,78 @@
 
     protected override async Task OnInitializedAsync()
     {
-        if (!redisCache.TryGetValue(RedisKeys.PRODUCTS, out ProductDto[]? minimalProducts))
-        {
-            minimalProducts = await _client
-                .GetFromJsonAsync<ProductDto[]>(options.Value.BaseUrl + "/Product/All")
-                .ConfigureAwait(false);
+        var minimalProducts = await hybridCache
+            .GetOrCreateAsync(
+                key: HybridKeys.PRODUCTS,
+                state: new { Client = _client, Url = options.Value.BaseUrl },
+                factory: async (state, cancellationToken) =>
+                {
+                    return await state.Client
+                        .GetFromJsonAsync<ProductDto[]>(state.Url + "/Product/All", cancellationToken: cancellationToken)
+                        .ConfigureAwait(false);
+                },
+                options: new HybridCacheEntryOptions
+                {
+                    LocalCacheExpiration = TimeSpan.FromDays(2),
+                    Expiration = TimeSpan.FromDays(1)
+                }
+            )
+            .ConfigureAwait(false);
 
-            redisCache.Set(RedisKeys.PRODUCTS, minimalProducts, TimeSpan.FromDays(2));
-        }
+        var assets = await hybridCache
+            .GetOrCreateAsync(
+                key: HybridKeys.ASSETS,
+                state: new { Client = _client, Url = options.Value.BaseUrl },
+                factory: async (state, cancellationToken) =>
+                {
+                    return await state.Client
+                        .GetFromJsonAsync<AssetDto[]>(state.Url + "/Asset/All", cancellationToken: cancellationToken)
+                        .ConfigureAwait(false);
+                },
+                options: new HybridCacheEntryOptions
+                {
+                    LocalCacheExpiration = TimeSpan.FromDays(2),
+                    Expiration = TimeSpan.FromDays(1)
+                }
+            )
+            .ConfigureAwait(false);
 
-        if (!redisCache.TryGetValue(RedisKeys.ASSETS, out AssetDto[]? assets))
-        {
-            assets = await _client
-                .GetFromJsonAsync<AssetDto[]>(options.Value.BaseUrl + "/Asset/All")
-                .ConfigureAwait(false);
+        var prices = await hybridCache
+            .GetOrCreateAsync(
+                key: HybridKeys.PRICES,
+                state: new { Client = _client, Url = options.Value.BaseUrl },
+                factory: async (state, cancellationToken) =>
+                {
+                    return await state.Client
+                        .GetFromJsonAsync<PriceDto[]>(state.Url + "/Price/All", cancellationToken: cancellationToken)
+                        .ConfigureAwait(false);
+                },
+                options: new HybridCacheEntryOptions
+                {
+                    LocalCacheExpiration = TimeSpan.FromHours(4),
+                    Expiration = TimeSpan.FromHours(4)
+                }
+            )
+            .ConfigureAwait(false);
 
-            redisCache.Set(RedisKeys.ASSETS, assets, TimeSpan.FromDays(2));
-        }
+        var stocks = await hybridCache
+            .GetOrCreateAsync(
+                key: HybridKeys.STOCKS,
+                state: new { Client = _client, Url = options.Value.BaseUrl },
+                factory: async (state, cancellationToken) =>
+                {
+                    return await state.Client
+                        .GetFromJsonAsync<StockDto[]>(state.Url + "/Stock/All", cancellationToken: cancellationToken)
+                        .ConfigureAwait(false);
+                },
+                options: new HybridCacheEntryOptions
+                {
+                    LocalCacheExpiration = TimeSpan.FromSeconds(5),
+                    Expiration = TimeSpan.FromDays(5)
+                }
+            )
+            .ConfigureAwait(false);
 
-        if (!redisCache.TryGetValue(RedisKeys.PRICES, out PriceDto[]? prices))
-        {
-            prices = await _client
-                .GetFromJsonAsync<PriceDto[]>(options.Value.BaseUrl + "/Price/All")
-                .ConfigureAwait(false);
-
-            redisCache.Set(RedisKeys.PRICES, prices, TimeSpan.FromHours(4));
-        }
-
-        if (!redisCache.TryGetValue(RedisKeys.STOCKS, out StockDto[]? stocks))
-        {
-            stocks = await _client
-                .GetFromJsonAsync<StockDto[]>(options.Value.BaseUrl + "/Stock/All")
-                .ConfigureAwait(false);
-
-            redisCache.Set(RedisKeys.STOCKS, stocks, TimeSpan.FromSeconds(5));
-        }
 
         _products = minimalProducts
             .Select(x => ProductMapper.From(x, assets, prices, stocks))
@@ -118,10 +157,7 @@
 
     protected override async void OnAfterRender(bool firstRender)
     {
-        _productDetail.OnHiding = new EventCallback(null, () =>
-        {
-            navigation.NavigateTo("/catalog", true);
-        });
+        _productDetail.OnHiding = new EventCallback(null, () => { navigation.NavigateTo("/catalog", true); });
 
         await base.OnAfterRenderAsync(firstRender);
     }

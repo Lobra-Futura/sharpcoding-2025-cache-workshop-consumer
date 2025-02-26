@@ -47,6 +47,20 @@ builder.Services
     // this will make a connection multiplexer object available for IDistributedCache implementation
     .AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer.Connect(redisCs));
 
+/*
+ * hybrid cache uses an IDistributedCache impl as secondary cache (^)
+ * and IMemoryCache, by default, as primary cache
+ *
+ * require nugets
+ *      Microsoft.Azure.StackExchangeRedis
+ *      Microsoft.Extensions.Caching.StackExchangeRedis
+ *      Microsoft.Extensions.Caching.Hybrid
+ *
+ * (if not found):
+ * dotnet add package Microsoft.Extensions.Caching.Hybrid --version "9.0.0-preview.7.24406.2"
+ */
+builder.Services.AddHybridCache();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
