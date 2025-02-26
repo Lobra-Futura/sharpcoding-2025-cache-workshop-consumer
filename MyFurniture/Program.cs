@@ -17,7 +17,8 @@ builder.Services.Configure<Settings>(builder.Configuration.GetSection(nameof(Set
 builder
     .Services
     .AddBlazorBootstrap()
-    .AddHttpClient();
+    .AddHttpClient()
+    .AddMemoryCache();
 
 var app = builder.Build();
 

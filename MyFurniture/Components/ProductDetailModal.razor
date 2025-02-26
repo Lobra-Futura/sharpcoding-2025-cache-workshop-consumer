@@ -66,6 +66,10 @@ else
 
     protected override async void OnInitialized()
     {
+        /*
+         * this call is the last chance to have a fresh data
+         * I won't cache it
+         */
         var actualStock = await _client.GetFromJsonAsync<StockDto>(
             options.Value.BaseUrl + $"/Stock/{Product.Id}");
 
