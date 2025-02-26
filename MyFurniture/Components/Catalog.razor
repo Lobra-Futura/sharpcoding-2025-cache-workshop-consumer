@@ -1,8 +1,10 @@
 ﻿@page "/catalog"
+@using Microsoft.Extensions.Caching.Distributed
 @using Microsoft.Extensions.Caching.Memory
 @using Microsoft.Extensions.Options
 @using MyFurniture.Entity
 @using MyFurniture.Entity.Responses
+@using MyFurniture.Redis
 @attribute [StreamRendering]
 @rendermode InteractiveServer
 
@@ -10,6 +12,8 @@
 @inject IOptions<Settings> options
 @inject NavigationManager navigation
 @inject IMemoryCache memCache
+@inject IRedisCache redisCache
+@inject IDistributedCache distributedCache
 
 <PageTitle>Catalog</PageTitle>
 
@@ -69,40 +73,40 @@
 
     protected override async Task OnInitializedAsync()
     {
-        if (!memCache.TryGetValue(CacheKeys.PRODUCTS, out ProductDto[]? minimalProducts))
+        if (!redisCache.TryGetValue(RedisKeys.PRODUCTS, out ProductDto[]? minimalProducts))
         {
             minimalProducts = await _client
                 .GetFromJsonAsync<ProductDto[]>(options.Value.BaseUrl + "/Product/All")
                 .ConfigureAwait(false);
 
-            memCache.Set(CacheKeys.PRODUCTS, minimalProducts, DateTimeOffset.UtcNow.AddDays(2));
+            redisCache.Set(RedisKeys.PRODUCTS, minimalProducts, TimeSpan.FromDays(2));
         }
 
-        if (!memCache.TryGetValue(CacheKeys.ASSETS, out AssetDto[]? assets))
+        if (!redisCache.TryGetValue(RedisKeys.ASSETS, out AssetDto[]? assets))
         {
             assets = await _client
                 .GetFromJsonAsync<AssetDto[]>(options.Value.BaseUrl + "/Asset/All")
                 .ConfigureAwait(false);
 
-            memCache.Set(CacheKeys.ASSETS, assets, DateTimeOffset.UtcNow.AddDays(2));
+            redisCache.Set(RedisKeys.ASSETS, assets, TimeSpan.FromDays(2));
         }
 
-        if (!memCache.TryGetValue(CacheKeys.PRICES, out PriceDto[]? prices))
+        if (!redisCache.TryGetValue(RedisKeys.PRICES, out PriceDto[]? prices))
         {
             prices = await _client
                 .GetFromJsonAsync<PriceDto[]>(options.Value.BaseUrl + "/Price/All")
                 .ConfigureAwait(false);
 
-            memCache.Set(CacheKeys.PRICES, prices, DateTimeOffset.UtcNow.AddHours(12));
+            redisCache.Set(RedisKeys.PRICES, prices, TimeSpan.FromHours(4));
         }
 
-        if (!memCache.TryGetValue(CacheKeys.STOCKS, out StockDto[]? stocks))
+        if (!redisCache.TryGetValue(RedisKeys.STOCKS, out StockDto[]? stocks))
         {
             stocks = await _client
                 .GetFromJsonAsync<StockDto[]>(options.Value.BaseUrl + "/Stock/All")
                 .ConfigureAwait(false);
 
-            memCache.Set(CacheKeys.STOCKS, stocks, DateTimeOffset.Now.AddSeconds(5));
+            redisCache.Set(RedisKeys.STOCKS, stocks, TimeSpan.FromSeconds(5));
         }
 
         _products = minimalProducts
